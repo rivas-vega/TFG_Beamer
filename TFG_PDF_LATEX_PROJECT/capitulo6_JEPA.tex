@@ -1,0 +1,263 @@
+\chapter{World Models}
+\label{cap:modelos_mundo}
+
+El Capítulo~\ref{cap:nocontrastive} hemos mostrado como Barlow Twins y VICReg logran aprender representaciones sin recurrir a muestras negativas, regularizando directamente los momentos de segundo orden. Sin embargo, ambos métodos operan sobre pares estáticos de vistas de una misma observación: no contemplan la evolución temporal del entorno. En el momento en que se desea construir un sistema capaz de \emph{predecir} cómo evolucionarán las representaciones conceptuales en el tiempo, la arquitectura simétrica de dos encoders con pesos compartidos resulta estructuralmente insuficiente.
+
+Esta transición, del aprendizaje de representaciones~\cite{bengio2013representation} a procesos que emulan el razonamiento abstracto constituye el salto conceptual central de este capítulo. En este nuevo paradigma, el aprendizaje de representaciones se consolida como el paso necesario para poder razonar en abstracto sobre la dinámica del entorno~\cite{lecun2022path, lecun2025objectives} sin el coste de reconstruir el mundo a bajo nivel. La pieza clave es la introducción de un componente nuevo, el \textbf{predictor} $g_\phi$, que transforma la arquitectura de Joint Embedding en un \emph{modelo de mundo} (\textit{World Model}) capaz de simular transiciones en el espacio de representaciones. Como se verá, este cambio estructural reabre el problema del colapso (Sección~\ref{sec:demostracion_colapso}) en formas que las regularizaciones matriciales del Capítulo~\ref{cap:nocontrastive} no estaban diseñadas para resolver, y genera una tensión entre la simplicidad de la regularización y la complejidad del objetivo dinámico.
+
+El capítulo se organiza en torno a dos intentos históricos de abordar esta tensión. Primero, PLDM~\cite{sobal2022joint} extiende la regularización VICReg al caso temporal, mediante una pérdida de siete términos con gradientes en conflicto. Después, V-JEPA~\cite{assran2023self} abandona la regularización matricial en favor de mecanismos como la media exponencial y stop-gradient que, aunque eficaces empíricamente, carece de fundamento estadístico unificado. Ambas evidencian la necesidad de un marco más "principiado", proporcionado en el Capítulo~\ref{cap:leworldmodel}, cerrando la brecha teórica identificada: la hipótesis gaussiana que Barlow Twins y VICReg asumen implícitamente pero nunca imponen.
+
+\section{World Models}
+\label{sec:world_model_definicion}
+
+La noción de un modelo interno del mundo que permita \emph{imaginar} la evolución futura del entorno tiene sus raíces en la tradición de la teoría de control óptimo. En el contexto del aprendizaje de representaciones, LeCun~\cite{lecun2022path} formalizó esta idea como una pieza esencial de la inteligencia autónoma: un sistema que opera en un espacio de representaciones $\mathcal{Z}$ en lugar de intentar predecir directamente el espacio sensorial bruto $\mathcal{O}$ (típicamente imágenes en $\mathbb{R}^D$ con $D \gg d$), evitando así la necesidad de la reconstrucción a nivel de píxel.
+
+Estructuralmente, el paso de las arquitecturas simétricas del Capítulo~\ref{cap:nocontrastive} a un World Model introduce una \textbf{asimetría en la aquitectura}. En Barlow Twins y VICReg (Figura~\ref{fig:barlow_twins_arch}), las dos ramas de la red comparten el mismo encoder $f_\theta$ y desempeñan un papel intercambiable: cada una recibe una vista distorsionada de la misma observación, y la pérdida mide la discrepancia entre ambas. No hay noción de \emph{antes} y \emph{después}. En un World Model, por el contrario, la arquitectura consta de dos componentes funcionalmente distintos: un \textbf{encoder} que comprime la observación sensorial en una representación abstracta, y un \textbf{predictor} que simula la transición dinámica del entorno en el espacio de representaciones. El predictor $g_\phi(z_t)$ no es ``otro encoder''; es un modelo de la física del entorno, un tipo de objeto cualitativamente nuevo respecto a las arquitecturas del capítulo anterior. La Figura~\ref{fig:simetria_vs_asimetria} ilustra esquemáticamente esta arquitectura asimétrica  de \textit{Joint Predictive Embedding Architecture} (JEPA temporal).
+
+\begin{definition}[World Model o JEPA Temporal]
+Un World Model consta de dos componentes principales:
+\begin{enumerate}
+    \item \textbf{Encoder ($f_{\theta}$):} Una aplicación diferenciable que proyecta la observación del mundo real al estado abstracto:
+    \begin{equation}
+    z_t = f_{\theta}(o_t) \in \mathcal{Z} \subseteq \mathbb{R}^d
+    \end{equation}
+    \item \textbf{Predictor ($g_{\phi}$):} Una aplicación $g_{\phi} : \mathcal{Z} \to \mathcal{Z}$ que modela la transición de la física del entorno, prediciendo la representación abstracta del siguiente estado a partir de la representación del estado actual:
+    \begin{equation}
+    \hat{z}_{t+1} = g_{\phi}(z_t) \in \mathcal{Z} \subseteq \mathbb{R}^d
+    \end{equation}
+\end{enumerate}
+donde $\theta$ y $\phi$ son los parámetros optimizables del encoder y del predictor, respectivamente.
+\end{definition}
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tikzpicture}[
+    every node/.style={font=\footnotesize},
+    box/.style={draw=blue!40!black, rectangle, rounded corners=4pt, minimum width=2.2cm, minimum height=1.0cm, align=center, fill=blue!8, thick},
+    predbox/.style={draw=violet!40!black, rectangle, rounded corners=4pt, minimum width=2.2cm, minimum height=1.0cm, align=center, fill=violet!12, thick},
+    obs/.style={draw=gray!45!black, rectangle, rounded corners=4pt, minimum width=1.8cm, minimum height=1.0cm, align=center, fill=gray!8, thick},
+    act/.style={draw=orange!45!black, rectangle, rounded corners=4pt, minimum width=1.5cm, minimum height=0.8cm, align=center, fill=orange!8, thick},
+    lossbox/.style={draw=red!40!black, rectangle, rounded corners=4pt, fill=red!8, thick, minimum width=3.4cm, minimum height=1.2cm, align=center},
+    arrow/.style={->, >=stealth, line width=1.2pt, black!75}
+]
+
+    % ===== FILA SUPERIOR (PASO t) =====
+    \node[obs] (ot) {Observaci\'{o}n\\$o_t$};
+    \node[box, right=1.0cm of ot] (enc_t) {Encoder\\$f_\theta$};
+    \node[right=0.8cm of enc_t] (zt) {$z_t$};
+    \node[predbox, right=1.0cm of zt] (pred) {Predictor\\$g_\phi$};
+    \node[right=0.8cm of pred] (zhat) {$\hat{z}_{t+1}$};
+
+    % ===== FILA INFERIOR (PASO t+1) =====
+    \node[obs, below=1.8cm of ot] (ot1) {Observaci\'{o}n\\$o_{t+1}$};
+    \node[box, right=1.0cm of ot1] (enc_t1) {Encoder\\$f_\theta$};
+    \node[right=0.8cm of enc_t1] (zt1) {$z_{t+1}$};
+
+    % ===== PÉRDIDA DE PREDICCIÓN (CENTRADa VERTICALMENTE A LA DERECHA) =====
+    \node[lossbox, right=1.5cm of zhat, yshift=-1.4cm] (loss_asym) {P\'{e}rdida de Predicci\'{o}n\\$\mathcal{L}_{\text{pred}} = \|\hat{z}_{t+1} - z_{t+1}\|_2^2$};
+
+    % ===== CONEXIONES =====
+    \draw[arrow] (ot) -- (enc_t);
+    \draw[arrow] (enc_t) -- (zt);
+    \draw[arrow] (zt) -- (pred);
+    \draw[arrow] (pred) -- (zhat);
+
+    \draw[arrow] (ot1) -- (enc_t1);
+    \draw[arrow] (enc_t1) -- (zt1);
+
+    % Conexiones curvas tipo S hacia el punto medio izquierdo de la pérdida
+    \draw[arrow] (zhat.east) to[out=0, in=180] (loss_asym.west);
+    \draw[arrow] (zt1.east) to[out=0, in=180] (loss_asym.west);
+
+    % Pesos compartidos (vertical entre encoders, estilo Figura 5.2)
+    \draw[<->, dashed, line width=1.0pt, gray!70] (enc_t.south) -- node[left, text=black, align=center, font=\scriptsize] {pesos\\compartidos} (enc_t1.north);
+
+    % ===== CAPA DE FONDO (SOMBRA DE LA RAMA PREDICTIVA) =====
+    \begin{scope}[on background layer]
+        \node[draw=orange!30, fill=orange!5, dashed, thick, rounded corners=8pt, fit=(zt) (pred) (zhat), inner sep=6pt] (pred_zone) {};
+        \node[text=orange!80!black, font=\scriptsize\bfseries, above=0.05cm of pred_zone] {Predicci\'{o}n en el espacio de representaciones};
+    \end{scope}
+
+\end{tikzpicture}
+}
+\caption{Arquitectura de un World Model (JEPA Temporal). Un encoder $f_\theta$ procesa de forma independiente observaciones secuenciales $o_t$ y $o_{t+1}$ obteniendo sus representaciones $z_t$ y $z_{t+1}$. A partir del estado actual $z_t$, el predictor $g_\phi$ simula la transici\'{o}n en $\mathcal{Z}$, estimando la representaci\'{o}n futura $\hat{z}_{t+1}$. Finalmente, la p\'{e}rdida $\mathcal{L}_{\text{pred}}$ mide la discrepancia entre la predicci\'{o}n y la representación futura real.}
+\label{fig:simetria_vs_asimetria}
+\end{figure}
+
+El objetivo de esta nueva arquitectura es doble: (a) que el encoder aprenda, como efecto colateral de la tarea predictiva, a retener solo la estructura del mundo que admite predicción; y (b) que el predictor aprenda, dentro de ese espacio ya filtrado, la dinámica causal que rige su evolución. El predictor $g_{\phi}$ simula los cambios del entorno en el espacio latente. Predecir directamente en el espacio de representaciones $\mathcal{Z}$ evita la intratabilidad de reconstruir físicamente $o_{t+1}$ en $\mathbb{R}^D$, enfocando los recursos en las variables dinámicas predecibles (por ejemplo, el movimiento de un objeto) y descartando ruidos de fondo estocásticos imposibles de predecir a nivel de píxel.
+
+Sin embargo, esta formulación no resuelve por sí sola el problema del colapso (Sección~\ref{sec:demostracion_colapso}): si el encoder $f_\theta$ proyecta todas las observaciones a un mismo vector constante $z_t = c$ para todo $t$, el predictor $g_\phi$ puede aprender la función identidad $g_\phi(c) = c$ y la pérdida de predicción $\|\hat{z}_{t+1} - z_{t+1}\|_2^2$ se anula trivialmente. Regularizar el espacio $\mathcal{Z}$ para evitar esta degeneración es, una vez más, el desafío central.
+
+\section{La Extensión Temporal de VICReg y su Inestabilidad (PLDM)}
+\label{sec:vicreg_temporal_pldm}
+
+La primera estrategia históricamente explorada para regularizar un World Model fue la más directa: extender la regularización de VICReg al caso secuencial. El modelo \textbf{PLDM} (\textit{Predictive Latent Dynamics Model}), propuesto por Sobal et al.\ en 2022~\cite{sobal2022joint}, adoptó esta vía. En el escenario estático del Capítulo~\ref{cap:nocontrastive}, las representaciones de un batch se organizan en una matriz bidimensional $Z \in \mathbb{R}^{N \times d}$. Sin embargo, al incorporar la evolución temporal, el lote de trayectorias pasa a estar representado por un tensor tridimensional $Z \in \mathbb{R}^{N \times T \times d}$, donde $N$ es el tamaño del batch, $T$ es la longitud de la secuencia temporal y $d$ es la dimensionalidad del espacio latente.
+
+Esta transición de matriz a tensor provoca el incremento de términos de VICReg. Para evitar el colapso de la representación, la regularización ya no puede limitarse a una única dirección de variación. Ahora es necesario aplicar el marco de varianza y covarianza en dos ejes independientes de la estructura tensorial: por un lado, espacialmente (a lo largo de la dimensión del batch $N$, para evitar que diferentes trayectorias colapsen entre sí) y, por otro lado, temporalmente (a lo largo de la dimensión del tiempo $T$, para prevenir que una misma trayectoria colapse hacia un estado constante).
+
+Así, para un lote de trayectorias con índices $i \in [N]$ y pasos de tiempo $t \in [T]$, denotando los embeddings reales como $z_t^{(i)} = f_{\theta}(o_t^{(i)})$ y las predicciones del predictor como $\hat{z}_{t+1}^{(i)} = g_{\phi}(z_t^{(i)})$, la pérdida total de PLDM para entrenar conjuntamente el encoder $f_{\theta}$ y el predictor $g_{\phi}$ consta de \textbf{siete términos de pérdida acoplados}:
+\begin{equation}
+\mathcal{L}_{\text{PLDM}} = \mathcal{L}_{\text{pred}} + \alpha \mathcal{L}_{\text{var}} + \beta \mathcal{L}_{\text{cov}} + \gamma \mathcal{L}_{\text{time-sim}} + \zeta \mathcal{L}_{\text{time-var}} + \nu \mathcal{L}_{\text{time-cov}} + \mu \mathcal{L}_{\text{IDM}}
+\end{equation}
+
+donde los términos se definen formalmente de la siguiente manera:
+
+\begin{enumerate}
+    \item \textbf{Pérdida de Predicción ($\mathcal{L}_{\text{pred}}$):} Error cuadrático medio de la las predicciones contra las representaciones de los estados futuros:
+    \begin{equation}
+    \mathcal{L}_{\text{pred}} = \frac{1}{NT} \sum_{i=1}^{N} \sum_{t=1}^{T-1} \| \hat{z}_{t+1}^{(i)} - z_{t+1}^{(i)} \|_2^2
+    \end{equation}
+    \item \textbf{Varianza Espacial ($\mathcal{L}_{\text{var}}$):} Evita el colapso espacial forzando la varianza de cada característica a lo largo del batch a ser mayor que 1. Este término hereda directamente la función del término de varianza de VICReg (Definición~\ref{def:vicreg_varianza}), cuyo papel era prevenir el colapso dimensional (Sección~\ref{sec:colapso_dimensional_v2}) detectando y penalizando dimensiones cuya dispersión cae por debajo de un umbral.
+    \item \textbf{Covarianza Espacial ($\mathcal{L}_{\text{cov}}$):} Minimiza la correlación de características en el batch para reducir redundancia espacial, análogamente al término de covarianza de VICReg (Definición~\ref{def:vicreg_covarianza}).
+    \item \textbf{Varianza Temporal ($\mathcal{L}_{\text{time-var}}$):} Evita el colapso temporal forzando a que la representación cambie a lo largo del tiempo para una misma trayectoria. Aplicación sobre la dimensión temporal del término de varianza de  VICReg.
+    \item \textbf{Covarianza Temporal ($\mathcal{L}_{\text{time-cov}}$):} Minimiza la correlación cruzada de características a lo largo del tiempo. Aplicación sobre la dimensión temporal del término de covarianza de VICReg.
+    \item \textbf{Similitud Temporal ($\mathcal{L}_{\text{time-sim}}$):} Fuerza suavidad en las trayectorias temporales minimizando el cambio consecutivo:
+    \begin{equation}
+    \mathcal{L}_{\text{time-sim}} = \frac{1}{NT} \sum_{i=1}^{N} \sum_{t=1}^{T-1} \| z_t^{(i)} - z_{t+1}^{(i)} \|_2^2
+    \end{equation}
+    \item \textbf{Pérdida del Modelo de Dinámica Inversa ($\mathcal{L}_{\text{IDM}}$):} En los modelos donde el predictor admite acciones, $\hat{z}_{t+1}^{(i)} = g_{\phi}(z_t^{(i)}, a_t^{(i)})$, suele introducirse este término en la pérdida. Introduce una red neuronal auxiliar dentro de la función de pérdida, el modelo de dinámica inversa ($\text{idm}$), cuya tarea consiste en reconstruir la acción $a_t^{(i)}$ ejecutada por el agente a partir únicamente de las representaciones de los dos estados contiguos, $z_t^{(i)}$ y $z_{t+1}^{(i)}$. La pérdida se define como:
+    \begin{equation}
+    \mathcal{L}_{\text{IDM}} = \frac{1}{NT} \sum_{i=1}^{N} \sum_{t=1}^{T-1} \| \hat{a}_t^{(i)} - a_t^{(i)} \|_2^2 \quad \text{donde } \hat{a}_t^{(i)} = \text{idm}(z_t^{(i)}, z_{t+1}^{(i)})
+    \end{equation}
+\end{enumerate}
+
+\section{Dinámica de Gradientes en Conflicto e Intratabilidad}
+\label{sec:inestabilidad_gradientes}
+
+La optimización de la pérdida de PLDM conlleva algunos desafíos para su aplicación práctica: el elevado número de términos con distintos objetivos a optimizar induce interferencia entre sus gradientes \cite{yu2020gradient} y exige una costosa búsqueda de hiperparámetros para calibrar la ponderación entre los términos \cite{sobal2025planning}; a esto se suma el término de IDM (\textit{Inverse Dynamics Model}), que eleva aún más la complejidad del sistema al introducir una red neuronal completa dentro de la propia función de pérdida.
+
+\subsection*{El ajuste de los hiperparámetros}
+La pérdida $\mathcal{L}_{\text{PLDM}}$ depende de seis coeficientes de ponderación: $(\alpha, \beta, \gamma, \zeta, \nu, \mu) \in \mathbb{R}^6_+$. Encontrar la combinación óptima de estos coeficientes requiere realizar una búsqueda discreta (grid search) en un espacio de dimensión 6. Este proceso de calibrado no es trivial, requiriéndose estudios coeficiente por coeficiente para comprender su impacto en el comportamiento del global sistema~\cite{sobal2025planning}.
+
+\subsection*{Gradient Interference}
+Varios de los términos de pérdida tienen objetivos geométricos directamente opuestos.
+\begin{itemize}
+    \item El término de similitud temporal $\mathcal{L}_{\text{time-sim}}$ actúa como una \textbf{fuerza de atracción} contractiva que intenta juntar $z_t$ y $z_{t+1}$ para lograr trayectorias suaves.
+    \item El término de varianza temporal $\mathcal{L}_{\text{time-var}}$ actúa como una \textbf{fuerza de expansión} que intenta separar $z_t$ y $z_{t+1}$ para evitar que la trayectoria colapse en un punto constante del espacio $\mathcal{Z}$.
+\end{itemize}
+
+Esto se traduce en que sus respectivos gradientes respecto a los parámetros del encoder $\theta$ apuntan en direcciones casi opuestas:
+\begin{equation}
+\langle \nabla_{\theta} \mathcal{L}_{\text{time-sim}}, \nabla_{\theta} \mathcal{L}_{\text{time-var}} \rangle < 0
+\end{equation}
+Este conflicto es, en cierto sentido, una manifestación agravada del problema del operador de contracción estudiado en la Sección~\ref{sec:colapso_dimensional_v2}: aquí no solo existe una fuerza contractiva ($\mathcal{L}_{\text{pred}}$) que el sistema debe contrarrestar, sino que \emph{los propios términos reguladores se contradicen entre sí}, dando lugar a un fenómeno de interferencia de gradientes (gradient interference) durante la optimización~\cite{yu2020gradient}. 
+
+\section{Mecanismos Arquitectónicos de V-JEPA para Evitar el Colapso}
+\label{sec:vjepa_anticolapso}
+
+Paralelamente al desarrollo de PLDM, la arquitectura \textbf{V-JEPA} (\textit{Video Joint-Embedding Predictive Architecture}), propuesta por Assran et al.\ en 2023~\cite{assran2023self}, adoptó una filosofía radicalmente distinta frente al problema del colapso en el dominio visual. En lugar de usar términos de regularización matricial como hacía PLDM, V-JEPA los reemplaza por \textbf{dos mecanismos arquitectónicos complementarios} que actúan de forma simultánea. Al integrarlos, V-JEPA rompe la simetría de la optimización y dificulta el colapso hacia la solución trivial sin requerir fuerzas repulsivas explícitas.
+
+\subsection{Actualización por Media Exponencial (EMA)}
+\label{subsec:ema}
+
+El primer pilar de esta estrategia proviene originalmente de \textbf{BYOL} (\textit{Bootstrap Your Own Latent})~\cite{grill2020bootstrap}. BYOL mostró empíricamente que era posible aprender representaciones de calidad sin muestras negativas y sin regularización de covarianza, basándose en introducir una asimetría mediante una actualización retardada de los parámetros.
+
+Llevado al terreno de los Modelos de Mundo (JEPAs Temporales), este mecanismo consiste en abandonar el esquema de pesos compartidos entre los encoders de la \textit{JEA} (Figura~\ref{fig:simetria_vs_asimetria}) en favor de dos redes con parámetros separados. Una rama \textit{"online"} con parámetros $\theta$ procesa el estado actual $o_t$ y se actualiza por backpropagation estándar; por su parte, una rama \textit{objetivo} con parámetros $\bar{\theta}$ procesa el estado futuro $o_{t+1}$ y se actualiza únicamente mediante una media exponencial (EMA, por sus siglas en inglés) de los parámetros online:
+\begin{equation}
+\label{eq:ema_update}
+\bar{\theta} \leftarrow \tau \bar{\theta} + (1 - \tau)\,\theta, \qquad \tau \approx 1
+\end{equation}
+Al definir $\tau$ con un valor muy cercano a uno, se consigue que los parámetros de la red desacoplada ($\bar{\theta}$) se actualicen de forma muy gradual, incorporando los cambios de la red principal con un retardo (\emph{delay}) significativo. El objetivo del predictor es hacer coincidir su estimación, generada a partir de la rama online, con la representación que dicta la rama objetivo:
+\begin{equation}
+\label{eq:ema_loss}
+\mathcal{L}_{\text{EMA}} = \| \hat{z}_{t+1} - \text{sg}(z_{t+1}) \|_2^2 \quad \text{donde } \hat{z}_{t+1} = g_\phi(z_t) \text{ y } z_{t+1} = f_{\bar{\theta}}(o_{t+1})
+\end{equation}
+
+Aquí, $\text{sg}(\cdot)$ denota la operación de \textit{stop-gradient} que analizaremos a continuación. La asimetría de la EMA es crucial: el encoder objetivo $f_{\bar{\theta}}$ siempre va ``un paso por detrás'' del encoder online, creando un \textbf{blanco en movimiento} que impide la solución trivial. Si la red intentase colapsar a una constante $f_\theta(x) = c$, la media exponencial convergería lentamente a lo mismo, pero la discrepancia temporal entre ambas ramas genera un gradiente que se opone a dicho colapso.
+
+
+\begin{figure}[H]
+\centering
+\resizebox{0.95\linewidth}{!}{
+\begin{tikzpicture}[
+    every node/.style={font=\footnotesize},
+    online/.style={draw=green!50!black, rectangle, rounded corners=4pt, minimum width=2.4cm, minimum height=1.0cm, align=center, fill=green!10, thick},
+    target/.style={draw=orange!45!black, rectangle, rounded corners=4pt, minimum width=2.4cm, minimum height=1.0cm, align=center, fill=orange!8, thick},
+    predbox/.style={draw=green!50!black, rectangle, rounded corners=4pt, minimum width=2.2cm, minimum height=1.0cm, align=center, fill=green!10, thick},
+    obs/.style={draw=gray!45!black, rectangle, rounded corners=4pt, minimum width=1.8cm, minimum height=1.0cm, align=center, fill=gray!8, thick},
+    act/.style={draw=orange!45!black, rectangle, rounded corners=4pt, minimum width=1.5cm, minimum height=0.8cm, align=center, fill=orange!8, thick},
+    lossbox/.style={draw=red!40!black, rectangle, rounded corners=4pt, fill=red!5, thick, minimum width=3.4cm, minimum height=1.6cm, align=center},
+    arrow/.style={->, >=stealth, line width=1.2pt, black},
+    gradarrow/.style={->, >=stealth, line width=1.2pt, green!70!black, dashed},
+    nogradarrow/.style={->, >=stealth, line width=1.2pt, red, dashed}
+]
+
+    % ===== RAMA ONLINE (FILA SUPERIOR) =====
+    \node[obs] (ot) {Observaci\'{o}n\\$o_t$};
+    \node[online, right=1.0cm of ot] (enc_on) {Encoder Online\\$f_\theta$};
+    \node[right=0.8cm of enc_on] (zt) {$z_t$};
+    \node[predbox, right=1.0cm of zt] (pred) {Predictor\\$g_\phi$};
+    \node[right=0.8cm of pred] (zhat) {$\hat{z}_{t+1}$};
+
+    \node[font=\small\bfseries\sffamily, green!70!black, above=0.3cm of enc_on] {Rama Online};
+
+    % ===== RAMA OBJETIVO (FILA INFERIOR) =====
+    \node[obs, below=1.8cm of ot] (ot1) {Observaci\'{o}n\\$o_{t+1}$};
+    \node[target] (enc_tgt) at (enc_on |- ot1) {Encoder Objetivo\\$f_{\bar{\theta}}$};
+    \node[right=0.8cm of enc_tgt] (zt1) {$z_{t+1}$};
+
+    \node[font=\small\bfseries\sffamily, orange!70!black, below=0.3cm of enc_tgt] {Rama Objetivo};
+
+    % Stop-gradient en la rama objetivo
+    \node[draw, circle, thick, red, minimum size=0.6cm, font=\footnotesize\bfseries, text=red, right=0.8cm of zt1] (sg) {$\otimes$};
+    \node[below=0.1cm of sg, font=\scriptsize, red!70!black] {stop-grad};
+
+    % ===== PÉRDIDA =====
+    \node[lossbox, right=1.5cm of zhat, yshift=-1.4cm] (loss) {$\mathcal{L}_{\text{EMA}} = \|\hat{z}_{t+1} - \text{sg}(z_{t+1})\|_2^2$};
+
+    % ===== CONEXIONES FORWARD (Líneas continuas negras) =====
+    % Rama Online
+    \draw[arrow] ([yshift=5pt]ot.east) -- ([yshift=5pt]enc_on.west);
+    \draw[arrow] ([yshift=5pt]enc_on.east) -- ([yshift=5pt]zt.west);
+    \draw[arrow] ([yshift=5pt]zt.east) -- ([yshift=5pt]pred.west);
+    \draw[arrow] ([yshift=5pt]pred.east) -- ([yshift=5pt]zhat.west);
+    \draw[arrow] ([yshift=5pt]zhat.east) to[out=0, in=180] ([yshift=15pt]loss.west);
+
+    % Rama Objetivo
+    \draw[arrow] (ot1.east) -- (enc_tgt.west);
+    \draw[arrow] (enc_tgt.east) -- (zt1.west);
+    \draw[arrow] (zt1.east) -- (sg.west);
+    \draw[arrow] ([yshift=5pt]sg.east) to[out=0, in=180] ([yshift=-5pt]loss.west);
+
+    % ===== CONEXIONES BACKWARD (Líneas discontinuas en paralelo) =====
+    % Rama Online (Verde, flujo inverso)
+    \draw[gradarrow] ([yshift=5pt]loss.west) to[out=180, in=0] ([yshift=-5pt]zhat.east);
+    \draw[gradarrow] ([yshift=-5pt]zhat.west) -- ([yshift=-5pt]pred.east);
+    \draw[gradarrow] ([yshift=-5pt]pred.west) -- ([yshift=-5pt]zt.east) node[pos=0.7, below=12pt, font=\scriptsize, text=black] {$\nabla_\theta$ gradientes};
+    \draw[gradarrow] ([yshift=-5pt]zt.west) -- ([yshift=-5pt]enc_on.east);
+
+    % Rama Objetivo (Verde, flujo inverso desde loss a stop-grad)
+    \draw[gradarrow] ([yshift=-15pt]loss.west) to[out=180, in=0] node[pos=0.25, below=12pt, font=\scriptsize, text=black] {gradiente bloqueado} ([yshift=-5pt]sg.east);
+
+    % ===== EMA =====
+    \draw[->, >=stealth, thick, dashed, orange!70!black] (enc_on.south) -- node[left, font=\scriptsize, text=black, align=center] {EMA\\$\bar{\theta} \leftarrow \tau\bar{\theta} + (1-\tau)\theta$} (enc_tgt.north);
+
+\end{tikzpicture}
+}
+\caption{Dinámica V-JEPA aplicada a una arquitectura predictiva temporal. El modelo emplea: (a) rama online con parámetros $\bar{\theta}$ (superior) recibe gradientes regulares. (b) rama objetivo (inferior), bloquea los gradientes mediante el stop-gradient ($\otimes$) y se actualiza de forma pasiva a través de una media exponencial (EMA) de los pesos de la rama online.}
+\label{fig:ema_dinamica}
+\end{figure}
+
+
+\subsection{Stop-Gradient}
+\label{subsec:stop_gradient}
+
+El segundo mecanismo, representado por la operación $\text{sg}(\cdot)$ en la Ecuación~\ref{eq:ema_loss}, actúa en conjunto con la EMA. Desde el punto de vista de la optimización, el stop-gradient introduce una asimetría fundamental en el problema: la rama objetivo queda desacoplada de la función de pérdida y se convierte en una \emph{constante} durante cada paso de la optimización por backpropagation.
+
+Formalmente, el operador $\text{sg}(\cdot)$ bloquea el flujo del gradiente por la rama objetivo. Esto implica que durante la actualización de $\theta$:
+\begin{equation}
+\label{eq:stop_grad}
+\frac{\partial \mathcal{L}_{\text{EMA}}}{\partial \bar{\theta}} = 0
+\end{equation}
+Sin esta asimetría, el gradiente descendería simultáneamente por ambas ramas, haciendo que el sistema degenere rápidamente a la solución constante. El stop-gradient aísla al encoder encargado de procesar las representaciones futuras, cuyos parámetros dependen por completo del flujo diferido de los parámetros del encoder online.
+
+\section{Limitaciones de PLDM y V-JEPA}
+\label{sec:limitaciones_vjepa_pldm}
+
+Tanto PLDM como V-JEPA comparten una misma debilidad de fondo, como se ha estudiado a lo largo de este texto, bajo el marco de los Modelos Basados en Energía~\cite{lecun2006tutorial}, ninguno garantiza que la energía del sistema no colapse hacia una superficie plana y trivial en $\mathcal{Z}$.
+
+Los mecanismos de V-JEPA (EMA y stop-gradient) son heurísticas que abordan este colapso de forma indirecta. No tienen una interpretación variacional o probabilística, sino que alteran la dinámica de la optimización para retrasar el colapso de la energía. El hiperparámetro $\tau$ requiere un ajuste delicado, y el modelo no impone garantías sobre cómo se organiza la información en $\mathcal{Z}$.
+
+PLDM, en cambio, sí intenta una regularización estadística estructurada, pero hereda de VICReg una limitación que ya vimos en la Sección~\ref{sec:conclusiones_barlow}: toda la decorrelación descansa sobre el Puente de Jaynes (Sección~\ref{sec:barlow_hipotesis}), que solo equivale a independencia estadística bajo la hipótesis de normalidad en $\mathcal{Z}$. PLDM aplica esta decorrelación sin comprobar esa hipótesis: si $\mathcal{Z}$ no es normal, dos dimensiones pueden tener covarianza nula y, aun así, compartir información mutua ( Observación~\ref{rem:vicreg_jaynes}). Esto invalida las garantías de independencia de su regularización, algo que V-JEPA ni siquiera intenta.
+
+Las dos líneas son frágiles por razones distintas: a V-JEPA le falta un principio estadístico, y a PLDM le falta verificar el supuesto, la normalidad de $Z$, del que depende. Este matiz es el que motiva el marco que se desarrolla en el último capítulo: ¿es posible diseñar un EBM cuya regularización no solo asuma la normalidad de $\mathcal{Z}$, sino que la fuerce activamente? Esa regularización daría a V-JEPA el fundamento estadístico que le falta y cerraría la brecha que el Puente de Jaynes deja abierta en PLDM. Esa es la pregunta que SIGReg busca responder.

@@ -1,0 +1,105 @@
+\chapter{Fundamentos de Deep Learning}
+\label{ap:fundamentos_dl}
+
+Este apéndice recoge los conceptos fundamentales del aprendizaje profundo que sirven de base técnica a los desarrollos del texto principal. Se presenta como material de consulta para el lector no especializado en redes neuronales. Como referencias básicas para profundizar en estos fundamentos, remitimos al lector a: Goodfellow et al. \cite{goodfellow2016deep}, al trabajo clásico fundacional sobre retropropagación de Rumelhart et al. \cite{rumelhart1986learning}, y a la exhaustiva revisión sobre aprendizaje de representaciones de Bengio et al. \cite{bengio2013representation}.
+
+\section{El Perceptrón Multicapa (MLP)}
+\label{sec:mlp}
+
+El bloque constructivo fundamental de las arquitecturas utilizadas en este trabajo es la \textbf{red neuronal feedforward} o Perceptrón Multicapa (MLP, \textit{Multilayer Perceptron}) \cite{goodfellow2016deep}. Un MLP de $L$ capas ocultas define una aplicación parametrizada $f_\theta: \mathbb{R}^{d_0} \to \mathbb{R}^{d_L}$ mediante la composición de transformaciones afines y no linealidades:
+
+\begin{definition}[Red Neuronal Feedforward]
+Sea $d_0, d_1, \ldots, d_L \in \mathbb{N}$ la secuencia de dimensiones de cada capa. Para cada capa $\ell = 1, \ldots, L$, se definen una matriz de pesos $W^{(\ell)} \in \mathbb{R}^{d_\ell \times d_{\ell-1}}$ y un vector de sesgo $b^{(\ell)} \in \mathbb{R}^{d_\ell}$. La \textbf{propagación hacia adelante} (\textit{feedforward pass}) se define recursivamente como:
+\begin{equation}
+\label{eq:feedforward}
+h^{(0)} = x, \qquad
+h^{(\ell)} = \sigma\!\left(W^{(\ell)} h^{(\ell-1)} + b^{(\ell)}\right), \quad \ell = 1, \ldots, L-1, \qquad
+f_\theta(x) = W^{(L)} h^{(L-1)} + b^{(L)}
+\end{equation}
+donde $\sigma: \mathbb{R} \to \mathbb{R}$ es una función de activación no lineal aplicada elemento a elemento. El conjunto de parámetros entrenables es $\theta = \{W^{(\ell)}, b^{(\ell)}\}_{\ell=1}^{L}$.
+\end{definition}
+
+Las funciones de activación más comunes son:
+\begin{itemize}
+    \item \textbf{ReLU} (\textit{Rectified Linear Unit}): $\sigma(z) = \max(0, z)$. Es la función de activación por defecto en la mayoría de arquitecturas modernas por su eficiencia computacional y la ausencia del problema del gradiente que se desvanece.
+    \item \textbf{Sigmoide}: $\sigma(z) = (1 + e^{-z})^{-1} \in (0,1)$. Históricamente usada en capas de salida para clasificación binaria.
+    \item \textbf{GeLU} (\textit{Gaussian Error Linear Unit}): $\sigma(z) = z \cdot \Phi(z)$, donde $\Phi$ es la CDF de la normal estándar. Utilizada en Transformers.
+\end{itemize}
+
+La composición de transformaciones afines y no linealidades en \eqref{eq:feedforward} dota al MLP de \textbf{capacidad de aproximación universal}: bajo condiciones suaves, cualquier función continua puede aproximarse con precisión arbitraria aumentando la anchura o profundidad de la red \cite{goodfellow2016deep}.
+
+\subsection{Capa de Proyección Final y Características Pre-Activación}
+\label{subsec:capa_proyeccion}
+
+En el análisis teórico de las arquitecturas de aprendizaje profundo (como se realiza en el estudio del colapso dimensional), es común abstraer toda la complejidad no lineal de las primeras $L-1$ capas y centrar el análisis matemático riguroso en la dinámica de la última capa de la red. Para ello, la función global de la red neuronal se descompone conceptualmente en dos partes. Primero, un \textit{feature extractor} o encoder no lineal que engloba todas las capas intermedias y mapea la entrada original $x$ a un vector de características pre-activación (o representaciones profundas), denotado como $\phi(x) \in \mathbb{R}^m$. Segundo, una \textbf{capa de proyección final} puramente lineal parametrizada por una matriz de pesos $W \in \mathbb{R}^{d \times m}$. Omitiendo el término de bias por simplicidad geométrica y analítica (una práctica estándar en teoría de aprendizaje profundo), la salida completa de la red se puede expresar de forma compacta como el producto:
+\begin{equation}
+    f_W(x) = W \phi(x)
+\end{equation}
+Esta parametrización lineal resulta ser una herramienta analítica extremadamente poderosa, que permite aislar y estudiar la dinámica de evolución de los pesos finales $W$ durante el entrenamiento, expresando las fuerzas de optimización del gradiente directamente en función de la matriz de covarianza de las representaciones $\phi(x)$.
+
+\section{Funciones de Pérdida}
+\label{sec:loss_functions}
+
+El entrenamiento de una red neuronal consiste en encontrar los parámetros $\theta^*$ que minimizan una \textbf{función de pérdida} $\mathcal{L}(\theta)$ que mide la discrepancia entre las predicciones del modelo y la señal de supervisión disponible.
+
+\subsection{Error Cuadrático Medio (MSE)}
+\label{subsec:mse}
+
+En tareas de regresión, la pérdida de mínimos cuadrados es la elección estándar. Dado un conjunto de datos $\{(x_i, y_i)\}_{i=1}^N$:
+\begin{equation}
+\label{eq:mse}
+\mathcal{L}_{\text{MSE}}(\theta) = \frac{1}{N} \sum_{i=1}^N \| f_\theta(x_i) - y_i \|_2^2
+\end{equation}
+Como se discute en la Sección~\ref{subsec:generativo} del Capítulo~\ref{cap:intro}, la minimización de \eqref{eq:mse} bajo incertidumbre multimodal fuerza al modelo a predecir la esperanza condicional, lo que produce el efecto de borrosidad en visión.
+
+\subsection{Entropía Cruzada}
+\label{subsec:cross_entropy}
+
+Para tareas de clasificación con $C$ clases, se utiliza la función de pérdida de \textbf{entropía cruzada}, que mide la divergencia KL entre la distribución real $p$ y la predicha por el modelo $q_\theta$:
+\begin{equation}
+\label{eq:cross_entropy}
+\mathcal{L}_{\text{CE}}(\theta) = -\frac{1}{N} \sum_{i=1}^N \sum_{c=1}^C y_{ic} \log q_\theta(c \mid x_i)
+\end{equation}
+donde $q_\theta(c \mid x_i) = \text{softmax}(f_\theta(x_i))_c$ es la probabilidad predicha por el modelo para la clase $c$. Esta función es el análogo discreto de la log-verosimilitud negativa bajo la distribución de Gibbs-Boltzmann de \eqref{eq:boltzmann_dist}.
+
+\subsection{Aproximación por Minibatches}
+\label{subsec:minibatch}
+
+En el aprendizaje profundo, evaluar la expectativa matemática de una pérdida $\mathcal{L}(x)$ sobre la distribución completa de datos $p(x)$ (o sobre un conjunto de entrenamiento completo de gran cardinalidad $N$) resulta computacionalmente prohibitivo. Por ello, se recurre a la aproximación empírica mediante minilotes o \emph{minibatches}.
+
+Dado un subconjunto de datos $\mathcal{B} = \{x_i\}_{i=1}^B \subset \mathcal{X}$ de tamaño $B \ll N$ extraído uniformemente de la distribución de entrenamiento, la esperanza matemática de la pérdida se aproxima mediante el promedio empírico sobre dicho lote:
+\begin{equation}
+\label{eq:minibatch_approx}
+\mathbb{E}_{x \sim p(x)} [\mathcal{L}(x)] \approx \frac{1}{B} \sum_{i=1}^B \mathcal{L}(x_i)
+\end{equation}
+Este promedio proporciona un estimador insesgado de la pérdida total y del gradiente con respecto a los parámetros, reduciendo la carga de memoria y posibilitando la paralelización eficiente en aceleradores de hardware.
+
+\section{Retropropagación del Error (Backpropagation)}
+\label{sec:backprop}
+
+El algoritmo de \textbf{retropropagación} \cite{rumelhart1986learning} es el procedimiento que permite calcular eficientemente el gradiente $\nabla_\theta \mathcal{L}(\theta)$ respecto a todos los parámetros de la red, habilitando el entrenamiento por descenso de gradiente.
+
+\subsection{La Regla de la Cadena en Grafos Computacionales}
+\label{subsec:regla_cadena}
+
+La retropropagación es una aplicación sistemática de la regla de la cadena del cálculo diferencial a la estructura compositiva del MLP. Para una función compuesta $\mathcal{L} = \ell \circ f^{(L)} \circ \cdots \circ f^{(1)}$, el gradiente respecto a los parámetros de la capa $\ell$ se obtiene propagando el gradiente de la pérdida hacia atrás a través de las capas:
+\begin{equation}
+\label{eq:backprop_chain}
+\frac{\partial \mathcal{L}}{\partial W^{(\ell)}} = \frac{\partial \mathcal{L}}{\partial h^{(\ell)}} \cdot \frac{\partial h^{(\ell)}}{\partial W^{(\ell)}} = \delta^{(\ell)} \cdot \left(h^{(\ell-1)}\right)^\top
+\end{equation}
+donde $\delta^{(\ell)} = \frac{\partial \mathcal{L}}{\partial h^{(\ell)}}$ es el \textbf{error local} de la capa $\ell$, que se calcula recursivamente desde la última capa:
+\begin{equation}
+\label{eq:delta_recurse}
+\delta^{(L)} = \nabla_{h^{(L)}} \mathcal{L}, \qquad \delta^{(\ell)} = \left(W^{(\ell+1)}\right)^\top \delta^{(\ell+1)} \odot \sigma'\!\left(W^{(\ell)} h^{(\ell-1)} + b^{(\ell)}\right)
+\end{equation}
+donde $\odot$ es el producto de Hadamard (elemento a elemento) y $\sigma'$ es la derivada de la función de activación. La complejidad computacional de una pasada completa hacia adelante y hacia atrás es $\mathcal{O}\!\left(\sum_\ell d_\ell \cdot d_{\ell-1}\right)$, lineal en el número de parámetros.
+
+\subsection{Descenso de Gradiente Estocástico (SGD) y Adam}
+\label{subsec:optimizers}
+
+Una vez calculados los gradientes mediante \eqref{eq:backprop_chain}--\eqref{eq:delta_recurse}, los parámetros se actualizan iterativamente. La regla de actualización del \textbf{Descenso de Gradiente Estocástico} (SGD) es:
+\begin{equation}
+\label{eq:sgd}
+\theta_{t+1} = \theta_t - \eta \, \nabla_\theta \mathcal{L}_{\mathcal{B}_t}(\theta_t)
+\end{equation}
+donde $\eta > 0$ es la tasa de aprendizaje y $\mathcal{L}_{\mathcal{B}_t}$ es la pérdida evaluada sobre un minilote $\mathcal{B}_t$ de muestras elegidas aleatoriamente. En la práctica, el optimizador más utilizado es \textbf{Adam} \cite{goodfellow2016deep}, que mantiene medias exponenciales del gradiente y del cuadrado del gradiente para adaptar la tasa de aprendizaje de forma individual para cada parámetro, obteniendo una convergencia más rápida y robusta que SGD puro.

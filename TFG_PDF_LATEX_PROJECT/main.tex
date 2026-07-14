@@ -1,0 +1,328 @@
+%!%!TEX TS-program = pdflatex
+%!TEX encoding = utf8 
+\documentclass[12pt, oneside, openany]{book}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english, spanish, es-noshorthands]{babel}
+%% FONTS: libertine+biolinum+stix
+\usepackage[mono=false]{libertine}
+\usepackage[notext]{stix}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+% =====================
+% = Datos importantes =
+% =====================
+% hay que rellenar estos datos y luego
+% ir a \begin{document}
+
+\title{Fundamentos Matem\'aticos de los Energy-Based Models y las Joint Embedding Architectures}
+\newcommand{\mysubtitle}[1]{\newcommand{\guardasubtitle}{#1}}
+\mysubtitle{Del Representation Collapse a los World Models}
+\author{\large Pedro Rivas Vega}
+\date{\today}
+\newcommand{\tutores}[1]{\newcommand{\guardatutores}{#1}}
+\tutores{Prof. Eduardo Sánchez Karhunen\\}
+% Definición
+\newcommand{\departamento}[2]{\newcommand{\guardadepartamento}{#2}}
+
+% Uso (el primer argumento #1 parece ignorado en tu definición actual, 
+% pero pasas el nombre del departamento como #2)
+\departamento{CCIA}{Ciencias de la Computación e Inteligencia Artificial\\}
+
+% ======================
+% = Páginas de títulos =
+% ======================
+\makeatletter
+\edef\maintitle{\@title}
+\renewcommand\maketitle{%
+  \begin{titlepage}
+      \vspace*{1.5cm}
+      \parskip=0pt
+      \Huge\bfseries
+      \begin{center}
+          \leavevmode\includegraphics[totalheight=6cm]{sello.pdf}\\[2cm]
+          \@title\\[0.5cm]
+          {\Large\normalfont\guardasubtitle}
+      \end{center}
+      \vspace{1cm}
+      \begin{center}
+          \@author
+      \end{center}
+  \end{titlepage}
+  
+  \begin{titlepage}
+  \parindent=0pt
+  \begin{flushleft}
+  \vspace*{1.5mm}
+  \setlength\baselineskip{0pt}
+  \setlength\parskip{0mm}
+  \begin{center}
+      \leavevmode\includegraphics[totalheight=4.5cm]{sello.pdf}
+  \end{center}
+  \end{flushleft}
+  \vspace{1cm}
+  \bgroup
+  \Large \bfseries
+  \begin{center}
+  \@title\\[0.4cm]
+  {\large\normalfont\guardasubtitle}
+  \end{center}
+  \egroup
+  \vspace*{.5cm}
+  \begin{center}
+  \@author
+  \end{center}
+  \vspace*{1.8cm}
+  \begin{flushright}
+  \begin{minipage}{8.45cm}
+      Memoria presentada como parte de los requisitos para la obtención del título de
+      Grado en Matemáticas por la Universidad de Sevilla.
+
+      \vspace*{7.5mm}
+
+      Tutorizada por
+      % \vspace*{5mm}
+  \end{minipage}\par
+  \begin{tabularx}{8.45cm}[b]{@{}l}
+      \guardatutores
+      \guardadepartamento
+  \end{tabularx}
+  \end{flushright}
+      \vspace*{\fill}
+   \end{titlepage}
+   
+
+   %%% Esto es necesario...
+   \pagestyle{tfg}
+   \renewcommand{\chaptermark}[1]{\markright{\thechapter.\space ##1}}
+   \renewcommand{\sectionmark}[1]{}
+   \renewcommand{\subsectionmark}[1]{}
+  }
+\makeatother
+
+% ======================================
+% = Color de la Universidad de Sevilla =
+% ======================================
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta, shadows, positioning, calc, matrix, shapes.geometric, backgrounds, fit}
+\definecolor{USred}{cmyk}{0,1.00,0.65,0.34}
+
+% =========
+% = Otros =
+% =========
+\usepackage[]{tabularx}
+\usepackage[]{enumitem}
+\setlist{noitemsep}
+\usepackage{url}           % para \url{} en entradas BibTeX
+\usepackage[font=footnotesize]{caption} % Tamaño pequeño para los pies de figura
+\usepackage[bottom]{footmisc} % Obliga a que las notas al pie estén siempre pegadas al margen inferior
+\usepackage{float} % Permite usar [H] para forzar la posición de las figuras
+
+% ==========================
+% = Matemáticas y teoremas =
+% ==========================
+\usepackage[]{amsmath}
+\usepackage[]{amsthm}
+\usepackage[]{mathtools}
+\usepackage[]{bm}
+\usepackage[]{thmtools}
+
+% ── Cajas destacadas (notas del paper) ──────────────────────
+\usepackage[most]{tcolorbox}
+\definecolor{miBorde}{HTML}{941120}
+\newtcolorbox{mybox}{
+    colback=miBorde!5!white,
+    colframe=miBorde,
+    arc=3pt,
+    boxrule=1.2pt,
+    fontupper=\small\sffamily,
+    left=8pt, right=8pt, top=6pt, bottom=6pt
+}
+\newcommand{\marcador}{\vrule height 10pt depth 2pt width 2pt \hskip .5em\relax}
+\newcommand{\cabeceraespecial}{%
+    \color{USred}%
+    \normalfont\bfseries}
+\declaretheoremstyle[
+    spaceabove=\medskipamount,
+    spacebelow=\bigskipamount,
+    headfont=\cabeceraespecial\marcador,
+    notefont=\cabeceraespecial,
+    notebraces={(}{)},
+    bodyfont=\normalfont\itshape,
+    postheadspace=1em,
+    numberwithin=chapter,
+    headindent=0pt,
+    headpunct={.}
+    ]{importante}
+\declaretheoremstyle[
+    spaceabove=\medskipamount,
+    spacebelow=\bigskipamount,
+    headfont=\normalfont\itshape\color{USred},
+    notefont=\normalfont,
+    notebraces={(}{)},
+    bodyfont=\normalfont,
+    postheadspace=1em,
+    numberwithin=chapter,
+    headindent=0pt,
+    headpunct={.}
+    ]{normal}
+\declaretheoremstyle[
+    spaceabove=\medskipamount,
+    spacebelow=\bigskipamount,
+    headfont=\normalfont\itshape\color{USred},
+    notefont=\normalfont,
+    notebraces={(}{)},
+    bodyfont=\normalfont,
+    postheadspace=1em,
+    headindent=0pt,
+    headpunct={.},
+    numbered=no,
+    qed=\color{USred}\marcador
+    ]{demostracion}
+
+% Los nombres de los enunciados. Añade los que necesites.
+\declaretheorem[name=Observaci\'on, style=normal]{remark}
+\declaretheorem[name=Corolario, style=normal]{corollary}
+\declaretheorem[name=Proposici\'on, style=normal]{proposition}
+\declaretheorem[name=Lema, style=normal]{lemma}
+\declaretheorem[name=Ejemplo, style=normal]{example}
+
+\declaretheorem[name=Teorema, style=importante]{theorem}
+\declaretheorem[name=Definici\'on, style=importante]{definition}
+
+\let\proof=\undefined
+\declaretheorem[name=Demostraci\'on, style=demostracion]{proof}
+
+% ============================
+% = Hipervínculos (hyperref) =
+% ============================
+\usepackage[
+    colorlinks=true,
+    linkcolor=USred,
+    citecolor=USred,
+    urlcolor=USred,
+    bookmarksnumbered=true,
+    pdfencoding=auto,
+    unicode=true
+]{hyperref}
+
+
+% ============================
+% = Composición de la página =
+% ============================
+\usepackage[
+	a4paper,
+    textwidth=80ex,
+]{geometry}
+
+\linespread{1.069}
+\parskip=10pt plus 1pt minus .5pt
+\frenchspacing
+% \raggedright
+
+% Margen vertical adicional para figuras
+\setlength{\intextsep}{\bigskipamount}
+\setlength{\textfloatsep}{\bigskipamount}
+
+
+% ==============================
+% = Composición de los títulos =
+% ==============================
+
+\usepackage[explicit]{titlesec}
+
+\newcommand{\hsp}{\hspace{20pt}}
+\titleformat{\chapter}[hang]
+    {\Huge\sffamily\bfseries}
+    {\thechapter\hsp\textcolor{USred}{\vrule width 2pt}\hsp}{0pt}
+    {#1}
+\titleformat{\section}
+  {\normalfont\Large\sffamily\bfseries}{\thesection\space\space}
+  {1ex}
+  {#1}
+\titleformat{\subsection}
+  {\normalfont\large\sffamily\bfseries}{\thesubsection\space\space}
+  {1ex}
+  {#1}
+
+% =======================
+% = Cabeceras de página =
+% =======================
+\usepackage[]{fancyhdr}
+\usepackage[]{emptypage}
+\fancypagestyle{plain}{%
+    \fancyhf{}%
+    \renewcommand{\headrulewidth}{0pt}
+    \renewcommand{\footrulewidth}{0pt}
+}
+\fancypagestyle{tfg}{%
+    \fancyhf{}%
+    \renewcommand{\headrulewidth}{0pt}
+    \renewcommand{\footrulewidth}{0pt}
+    \fancyhead[LE]{{\normalsize\color{USred}\bfseries\thepage}\quad
+                    \small\textsc{\MakeLowercase{\maintitle}}}
+    \fancyhead[RO]{\small\textsc{\MakeLowercase{\rightmark}}%
+                    \quad{\normalsize\bfseries\color{USred}\thepage}}%
+                    }
+
+% =============================
+% = El documento empieza aquí =
+% =============================
+\begin{document}
+
+
+
+\maketitle
+
+\frontmatter
+
+\tableofcontents
+
+\mainmatter
+
+\chapter*{Resumen}
+\addcontentsline{toc}{chapter}{Resumen}
+\markright{Resumen}
+Si se observa el aprendizaje en la naturaleza, en el desarrollo cognitivo de un niño, en la adquisición del lenguaje, en la formación gradual del sentido común resulta razonable conjeturar que la mayor parte del conocimiento se adquiere por la mera observación del mundo, sin etiquetas ni recompensas externas. Solo una fracción pequeña proviene de la interacción supervisada con un instructor, y una parte aún más reducida del ensayo y error deliberado. Esta jerarquía de observación, supervisión, exploración coincide con la ``Analogía del Pastel'' de Yann LeCun, que situó el \textbf{aprendizaje auto-supervisado} (SSL) como el cuerpo esencial de todo sistema cognitivo eficiente. La hipótesis de fondo es que de este proceso de observación pura emergen los conceptos abstractos que estructuran el entendimiento del mundo: no como réplicas del estímulo sensorial, sino como abstracciones de sus relaciones invariantes.
+
+Esta hipótesis ha sido verificada con éxito sobre el lenguaje natural. El lenguaje constituye un proxy simbólico del mundo real: dominio es discreto, dimensionalidad manejable, y la tarea de predecir el siguiente token codifica implícitamente la estructura semántica y lógica de la realidad. Sobre esta base, los \textit{Large Language Models} (LLM) han demostrado que el SSL a escala produce capacidades de razonamiento emergentes de una potencia sin precedentes. La pregunta que abre este trabajo es, por tanto, inevitable: \textit{¿cómo trasladar este mismo razonamiento a datos mucho más cercanos al mundo físico, como visión, vídeo, datos espaciales o datos de interacción, que son continuos, de alta dimensionalidad y carecen de un token natural?}
+
+Para responderla, este trabajo explora un paradigma que lleva rondando desde los años noventa, silencioso y paralelo a los enfoques discriminativos y generativos que han dominado la historia del aprendizaje automático: las \textbf{Joint Embedding Architectures} (JEA). Lejos de reconstruir el mundo o de clasificarlo, las JEA aprenden a proyectar observaciones correlacionadas a un espacio latente compartido donde la compatibilidad semántica reemplaza a la similitud superficial. Este principio, enunciado por primera vez en el contexto de las redes siamesas de Bromley y LeCun en 1993, permaneció durante décadas en los márgenes de la investigación. Hoy, con el impulso de la escala computacional y la madurez teórica, se erige como una de las piezas más prometedoras para construir sistemas capaces de razonar, predecir las consecuencias de sus acciones y actuar de forma autónoma en el mundo físico. El marco teórico que las unifica es el de los \textbf{Modelos Basados en Energía} (EBM): funciones de compatibilidad no normalizadas cuya función de partición resulta analíticamente intratable en el dominio continuo de la visión, en contraste con el escenario discreto y tratable del softmax en los LLM, y cuya forma óptima queda fundamentada, como se demuestra en este trabajo, en el Principio de Máxima Entropía de Jaynes.
+
+El recorrido que propone esta memoria es un \textit{viaje evolutivo}: desde las primeras redes siamesas y el problema del colapso trivial de la representación, problema central que articula toda la obra, hasta las soluciones contrastivas, las regularizaciones matriciales no contrastivas de Barlow Twins y VICReg, los mecanismos ad-hoc de V-JEPA, y finalmente \textbf{LeWorldModel}: una síntesis que reduce toda la regularización a un único funcional escalar fundado en el Teorema de Cramér-Wold, y que habilita la planificación autónoma por control óptimo en entornos visuales complejos. El trabajo concluye mirando al futuro con una pregunta que el propio paradigma plantea, y quizás con algo de vértigo histórico. Las redes convolucionales de LeCun, formuladas en los años ochenta, esperaron casi cuatro décadas hasta que la escala computacional les dio la razón. ¿Será el destino de las JEA, nacidas en esa misma época, repetir esa trayectoria? ¿Estaremos asistiendo, de nuevo, al comienzo silencioso de la próxima revolución?
+
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+\markright{English Abstract}
+\begin{otherlanguage}{english}
+If one observes learning as it occurs in nature, in the cognitive development of a child, in the acquisition of language, in the gradual formation of common sense, it becomes reasonable to conjecture that the majority of knowledge is acquired through pure observation of the world, without external labels or rewards. Only a small fraction arises from supervised interaction with a teacher, and an even smaller portion from deliberate trial and error. This hierarchy: observation, supervision, exploration, mirrors Yann LeCun's ``Cake Analogy,'' which placed \textbf{Self-Supervised Learning} (SSL) as the essential substance of any efficient cognitive system. The underlying hypothesis is that, from this process of unsupervised observation, abstract concepts emerge within the network's internal representation space, not as replicas of sensory stimuli, but as abstractions of their invariant relational structure.
+
+This hypothesis has been verified with extraordinary success on natural language. Language constitutes a symbolic proxy for the real world: its domain is discrete, its dimensionality manageable, and the task of predicting the next token implicitly encodes the semantic and logical structure of reality. On this foundation, Large Language Models (LLMs) have demonstrated that SSL at scale produces emergent reasoning capabilities of unprecedented power. The question that opens this thesis is therefore unavoidable: \textit{how can this same reasoning be extended to data far closer to the physical world (vision, video, spatial data, interaction data) which are continuous, high-dimensional, and lack a natural token structure?}
+
+To address it, this thesis explores a paradigm that has lingered since the nineteen-nineties, quiet and parallel to the discriminative and generative approaches that have dominated the history of machine learning: \textbf{Joint Embedding Architectures} (JEAs). Rather than reconstructing the world or classifying it, JEAs learn to project correlated observations into a shared latent space where semantic compatibility replaces superficial similarity. This principle, first articulated in the context of Bromley and LeCun's Siamese networks in 1993, remained at the margins of research for decades. Today, driven by computational scale and theoretical maturity, it stands as one of the most promising building blocks for systems capable of reasoning, predicting the consequences of their actions, and acting autonomously in the physical world. The theoretical framework that unifies them is that of \textbf{Energy-Based Models} (EBMs): unnormalized compatibility functions whose partition function is analytically intractable in the continuous visual domain---in sharp contrast to the discrete, tractable softmax of LLMs---and whose optimal form is grounded, as this thesis demonstrates, in Jaynes' Principle of Maximum Entropy.
+
+The journey this thesis proposes is an \textit{evolutionary one}: from the first Siamese networks and the problem of trivial representation collapse---the central problem articulating the entire work---through contrastive solutions, the non-contrastive matrix regularizations of Barlow Twins and VICReg, the ad-hoc mechanisms of V-JEPA, and finally \textbf{LeWorldModel}: a synthesis that reduces all regularization to a single scalar functional grounded in the Cram\'er-Wold Theorem, and that enables autonomous planning through optimal control in complex visual environments. The thesis concludes by looking toward the future with a question the paradigm itself raises---and perhaps with a certain historical vertigo. LeCun's convolutional networks, formulated in the nineteen-eighties, waited nearly four decades for computational scale to vindicate them. Will the JEAs, born in that same era, follow the same trajectory? Are we witnessing, once again, the quiet beginning of the next revolution?
+\end{otherlanguage}
+
+
+\include{capitulo1}
+\include{capitulo2_ebm}
+\include{capitulo3_siamesas}
+\include{capitulo4_contrastive}
+\include{capitulo5_barlow}
+\include{capitulo6_JEPA}
+\include{capitulo7_SIGReg}
+\include{capitulo8_conclusiones}
+
+\appendix
+\include{apendice_dl}
+\include{apendice_al}
+
+\backmatter
+
+\bibliographystyle{acm}
+\bibliography{referencias}
+
+\end{document}

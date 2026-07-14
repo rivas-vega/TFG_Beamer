@@ -1,0 +1,74 @@
+\chapter{Nociones de Álgebra Lineal}
+\label{ap:algebra_lineal}
+
+Este anexo recopila los conceptos fundamentales de álgebra lineal utilizados a lo largo de este trabajo para el análisis del colapso dimensional y la dinámica del aprendizaje en arquitecturas siamesas. Su objetivo no es proporcionar un tratamiento exhaustivo de la teoría espectral o del cálculo matricial, sino asentar la notación y recordar los teoremas clave sobre los que descansan las demostraciones del Capítulo~\ref{cap:siamesas_colapso}.
+
+\section{Matriz de Covarianza, Rango y Núcleo}
+\label{sec:al_covarianza_rango}
+
+En el contexto del aprendizaje de representaciones, trabajamos con variables aleatorias multidimensionales. Sea $Z$ un vector aleatorio que habita en el espacio euclídeo $\mathbb{R}^d$ (por ejemplo, el vector de activaciones o \textit{embedding} generado por la capa de salida de una red neuronal, donde $d$ es el número de neuronas), denotado como $Z = f_W(X)$, y con vector de medias $\mu = \mathbb{E}[Z]$. La \textbf{matriz de covarianza poblacional} se define como:
+\begin{equation}
+    \Sigma_\mathcal{Z} = \mathbb{E}\left[(Z - \mu)(Z - \mu)^T\right] \in \mathbb{R}^{d \times d}
+\end{equation}
+
+Esta matriz encapsula la estructura geométrica de la distribución de los embeddings. Por construcción, $\Sigma_\mathcal{Z}$ es una matriz \textbf{simétrica} ($\Sigma_\mathcal{Z} = \Sigma_\mathcal{Z}^T$) y \textbf{semidefinida positiva} ($v^T \Sigma_\mathcal{Z} v \ge 0$ para todo $v \in \mathbb{R}^d$). La forma cuadrática $v^T \Sigma_\mathcal{Z} v$ representa la varianza de la proyección escalar de los datos sobre la dirección unidimensional $v$:
+\begin{equation}
+    \operatorname{Var}(v^T Z) = v^T \Sigma_\mathcal{Z} v
+\end{equation}
+
+El \textbf{núcleo} (o espacio nulo) de $\Sigma_\mathcal{Z}$, denotado como $\operatorname{Ker}(\Sigma_\mathcal{Z})$, es un \textbf{subespacio vectorial} de $\mathbb{R}^d$ compuesto por las direcciones a lo largo de las cuales la representación no tiene varianza:
+\begin{equation}
+    \operatorname{Ker}(\Sigma_\mathcal{Z}) = \{ v \in \mathbb{R}^d \mid \Sigma_\mathcal{Z} v = 0 \}
+\end{equation}
+Dado que la varianza es nula para cualquier $v \in \operatorname{Ker}(\Sigma_\mathcal{Z})$, la proyección $v^T Z$ es constante casi seguramente, es decir, no se desvía de su media $v^T \mu$. Geométricamente, esto significa que las representaciones quedan confinadas en un \textbf{subespacio afín} (un subespacio vectorial trasladado por el vector $\mu$). En el contexto de las redes neuronales, esto implica que el modelo colapsa toda la información a un único valor a lo largo de esas direcciones; estas componentes (neuronas o combinaciones lineales de ellas) se vuelven funcionalmente inútiles (véase Sección~\ref{sec:colapso_dimensional_v2}).
+
+Por el \textbf{Teorema del Rango-Nulidad}, para cualquier matriz cuadrada de dimensión $d$:
+\begin{equation}
+    d = \operatorname{rango}(\Sigma_\mathcal{Z}) + \dim(\operatorname{Ker}(\Sigma_\mathcal{Z}))
+\end{equation}
+Por tanto, un rango deficiente ($\operatorname{rango}(\Sigma_\mathcal{Z}) = r < d$) implica inevitablemente la existencia de un subespacio nulo de dimensión $d-r$. A este fenómeno se le conoce como \textbf{colapso dimensional}.
+
+\section{Teorema Espectral para Matrices Simétricas}
+\label{sec:al_teorema_espectral}
+
+El Teorema Espectral es posiblemente el resultado más relevante del álgebra lineal para el análisis de componentes principales y la dinámica del descenso de gradiente.
+
+\begin{theorem}[Teorema Espectral]
+Toda matriz simétrica con coeficientes reales $A \in \mathbb{R}^{d \times d}$ es diagonalizable mediante una matriz ortogonal. Es decir, existe una matriz ortogonal $Q$ ($Q^TQ = QQ^T = I$) y una matriz diagonal $\Lambda$ tales que:
+\begin{equation}
+    A = Q \Lambda Q^T
+\end{equation}
+donde las columnas de $Q$ son una base ortonormal de autovectores de $A$, y los elementos de la diagonal de $\Lambda$ son los correspondientes autovalores reales $\lambda_i$.
+\end{theorem}
+
+Si además la matriz es semidefinida positiva (como ocurre con cualquier matriz de covarianza $\Sigma_\mathcal{Z}$), todos sus autovalores son no negativos ($\lambda_i \ge 0$). El rango de la matriz coincide exactamente con el número de autovalores estrictamente positivos.
+
+Este teorema permite desacoplar los sistemas de ecuaciones diferenciales lineales que gobiernan la dinámica del aprendizaje en redes lineales profundas. Mediante un simple cambio de base definido por $Q$, el comportamiento complejo y acoplado de los pesos se descompone en $d$ ecuaciones escalares independientes a lo largo de las direcciones principales de los datos.
+
+\section{Flujo de Gradiente y Desacoplamiento Espectral}
+\label{sec:al_flujo_gradiente}
+
+En la práctica, el entrenamiento de redes neuronales se realiza mediante algoritmos de optimización discretos, como el Descenso de Gradiente. Si denotamos por $\eta$ la tasa de aprendizaje (\textit{learning rate}) y $\mathcal{L}(W)$ la función de pérdida, la regla de actualización para la matriz de pesos $W$ en la iteración $t$ es:
+\begin{equation}
+    W_{t+1} = W_t - \eta \nabla_W \mathcal{L}(W_t)
+\end{equation}
+
+Esta ecuación puede reescribirse algebraicamente formando un cociente de diferencias finitas:
+\begin{equation}
+    \frac{W_{t+1} - W_t}{\eta} = - \nabla_W \mathcal{L}(W_t)
+\end{equation}
+
+Para facilitar el análisis matemático riguroso, en la teoría del aprendizaje profundo es común estudiar el límite temporal continuo de este proceso. Al tomar el límite cuando el tamaño del paso de aprendizaje se vuelve infinitesimal ($\eta \to 0$), el término izquierdo converge a la derivada temporal $\frac{dW(t)}{dt} \equiv \dot{W}(t)$. Así se obtiene la ecuación diferencial ordinaria (EDO) que rige la dinámica continua, conocida como \textbf{flujo de gradiente} (\textit{gradient flow}):
+\begin{equation}
+    \dot{W}(t) = -\nabla_W \mathcal{L}(W(t))
+\end{equation}
+
+Cuando el gradiente de la pérdida es lineal respecto a $W$, por ejemplo $\nabla_W \mathcal{L}(W) = W \Sigma$, obtenemos una EDO matricial acoplada de la forma $\dot{W}(t) = -W(t) \Sigma$. Aplicando el Teorema Espectral a la matriz simétrica $\Sigma = Q \Lambda Q^T$, podemos introducir el cambio de variables ortogonal $\tilde{W}(t) = W(t)Q$, transformando el sistema en:
+\begin{equation}
+    \dot{\tilde{W}}(t) = -\tilde{W}(t)\Lambda
+\end{equation}
+Esta formulación está completamente diagonalizada. Para cada entrada escalar $\tilde{w}_{ij}$, la ecuación resultante es un decaimiento exponencial simple: $\dot{\tilde{w}}_{ij}(t) = -\lambda_j \tilde{w}_{ij}(t)$, cuya solución exacta es:
+\begin{equation}
+    \tilde{w}_{ij}(t) = \tilde{w}_{ij}(0) e^{-\lambda_j t}
+\end{equation}
+Esta expresión matemática revela que la velocidad de convergencia (o contracción) está controlada exclusivamente por el espectro de $\Sigma$. Los autovalores grandes ($\lambda_j \gg 0$) provocan que los componentes del peso decaigan rápidamente hacia el origen, mientras que las direcciones del subespacio nulo ($\lambda_j = 0$) permanecen intactas. Este fenómeno es central para entender cómo las arquitecturas siamesas descartan características (véase la discusión sobre el Operador de Contracción en la Sección~\ref{sec:colapso_dimensional_v2}).

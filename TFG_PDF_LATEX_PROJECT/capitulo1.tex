@@ -1,0 +1,78 @@
+\chapter{Introducción y Fundamentos de Representation Learning}
+\label{cap:intro}
+
+El aprendizaje automático ha experimentado una transición en su objeto de estudio, pasando de optimizar fronteras de decisión supervisadas, a construir representaciones abstractas de los datos. En este capítulo introducimos los fundamentos del \textit{Representation Learning}, y presentamos los motivos por los que el paradigma JEA elude las limitaciones formales de los enfoques generativos y discriminativos tradicionales.
+
+\section{Espacio Latente y Reducción de la Dimensionalidad}
+\label{sec:espacio_latente}
+
+El objetivo central del \textit{Representation Learning} es construir un modelo paramétrico $f_\theta: \mathcal{X} \to \mathcal{Z}$ que proyecte datos desde un espacio de observación de alta dimensionalidad $\mathcal{X} \subseteq \mathbb{R}^D$ (siendo $D$ el número de píxeles, frecuencias o características "crudas") hacia un espacio $\mathcal{Z} \subseteq \mathbb{R}^d$, con $d \ll D$, que llamaremos espacio latente, espacio de embeddings o espacio de representaciones. El elemento clave es que este modelo no es diseñado manualmente, sino que sus parámetros $\theta$ se optimizan de forma iterativa, generando representaciones en $\mathcal{Z}$ que codifican conceptos abstractos (p.e. identidad, categoría o relación causal), representaciones no explícitamente presentes en los datos de entrada.
+
+\begin{definition}[Espacio Latente, Encoder y Mapeo de Embedding]
+Sea $\mathcal{X}$ el espacio de entrada y $(\mathcal{Z}, d_{\mathcal{Z}})$ el espacio latente, tomado como el espacio euclídeo $\mathbb{R}^d$ dotado de la distancia euclídea estándar $d_{\mathcal{Z}}(a,b) = \|a - b\|_2$. Definimos el encoder como una aplicación parametrizada $f_{\theta}: \mathcal{X} \to \mathcal{Z}$, donde $\theta \in \Theta$ representa el conjunto de parámetros (p.e. pesos de una red neuronal). Para cada elemento $x \in \mathcal{X}$, su imagen $z = f_{\theta}(x) \in \mathcal{Z}$ recibe el nombre de embedding de $x$.
+\end{definition}
+
+Geométricamente, denotamos como $\mathcal{Z} = f_{\theta}(\mathcal{X})$ al conjunto de todas las representaciones generadas por la red. Este conjunto $\mathcal{Z} \subseteq \mathbb{R}^d$ habita dentro de un espacio vectorial euclídeo de dimensión $d$, siendo $d$, el número de neuronas de la capa de salida del encoder (Apéndice~\ref{ap:fundamentos_dl}).
+
+\section{Tres Paradigmas: Discriminativo, Generativo y Joint Embedding}
+\label{sec:tres_paradigmas}
+
+Antes de estudiar por qué las \textit{Joint Embedding Architectures} constituyen una base adecuada para el \textit{representation learning}, y por tanto, para la construcción del espacio $\mathcal{Z}$, conviene analizar el contexto en el que se enmarcan en relación con los enfoques más tradicionales.
+
+
+\subsection{El Enfoque Discriminativo}
+Los modelos discriminativos tienen como objetivo estimar la distribución de probabilidad condicional de una variable objetivo o etiqueta $y \in \mathcal{Y}$ condicionada a un dato de entrada $x \in \mathcal{X}$:
+\begin{equation}
+p(y \mid x) = \frac{p(x, y)}{p(x)}
+\end{equation}
+donde $p(x,y)$ denota la densidad conjunta de etiquetas y datos, y donde $p(x)$ es la densidad marginal de las observaciones. Para ilustrar este paradigma, consideremos dos escenarios típicos de aplicación:
+\begin{itemize}
+    \item \textbf{Clasificación de imágenes:} El espacio de entrada $\mathcal{X} = [0, 1]^{H \times W \times C}$ representa imágenes de dimensión $H \times W$ con $C$ canales de color, mientras que el espacio de etiquetas es discreto y finito, $\mathcal{Y} = \{1, 2, \dots, K\}$, donde $K$ representa categorías mutuamente excluyentes. El objetivo consiste en estimar la probabilidad $p(y = k \mid x)$ para cada clase $k \in K$.
+    \item \textbf{Regresión (p.e. la típica valoración inmobiliaria):} El espacio de entrada $\mathcal{X} \subset \mathbb{R}^D$ codifica $D$ características físicas y/o históricas de un inmueble (superficie, antigüedad, ubicación geográfica, número de estancias), mientras que el espacio de salida es continuo, $\mathcal{Y} = \mathbb{R}^+$, correspondiente a su precio de mercado. En este caso, el modelo estima el valor esperado del inmueble condicionado a sus características, es decir, la esperanza condicional $\mathbb{E}[y \mid x]$.
+\end{itemize}
+Aunque el modelado discriminativo constituye el pilar del aprendizaje supervisado tradicional \cite{goodfellow2016deep} y es altamente efectivo para resolver tareas de predicción específicas, presenta limitaciones para el aprendizaje de representaciones generales de los datos \cite{bengio2013representation}. En primer lugar, su formulación supervisada habitual, depende de un supervisor humano que suministre las etiquetas en $\mathcal{Y}$, un factor limitante en términos de escalabilidad y coste (computacional y humano) \cite{lecun2022path}. En segundo lugar, y desde una perspectiva de teoría de la información, en concordancia con el principio del cuello de botella de la información \cite{tishby2000information}, al optimizar el modelo exclusivamente para predecir la variable objetivo, los gradientes fuerzan a la red a descartar toda variabilidad y estructura geométrica de $\mathcal{X}$ que no sea estrictamente útil para resolver la tarea en cuestión. El descarte de características que pueden ser valiosas para tareas secundarias o futuras, motivó la búsqueda de paradigmas auto-supervisados, que fueran capaces de extraer regularidades directamente de la propia estructura de los datos \cite{bengio2013representation}, dando paso inicialmente al modelado generativo.
+
+
+\subsection{El Enfoque Generativo}
+\label{subsec:generativo}
+El enfoque generativo tiene como objetivo modelar la distribución de probabilidad de los datos de manera que le permita generar o reconstruir muestras en el espacio original $\mathcal{X}$. Este paradigma es la base del éxito de los modelos fundacionales modernos, ya sean arquitecturas autorregresivas (tipo GPT) utilizadas en el procesamiento del lenguaje o modelos de difusión utilizados para la generación de imágenes. Sin embargo, forzar al sistema a generar o reconstruir el entorno puede resultar ineficiente. 
+
+Para razonar y ``pensar'' sobre el mundo no parece imprescindible recrearlo a nivel de píxeles o detalles físicos, bastaría con operar sobre representaciones abstractas de sus conceptos. De hecho, los modelos generativos desarrollan y utilizan estas representaciones abstractas en sus capas intermedias para guiar el proceso. Pero el paradigma obliga a materializarlas y concretarlas en reconstrucciones explícitas en el espacio original $\mathcal{X}$, introduciendo ineficiencias. Por ejemplo, para decidir si es seguro cruzar una calle, es necesario predecir la trayectoria futura y el comportamiento del vehículo que se aproxima; resulta ineficiente que el modelo se vea forzado a concretar esa predicción determinando p.e. el movimiento del paisaje de fondo. El modelado generativo obliga a consumir importantes recursos computacionales en representar estos detalles estocásticos, en lugar de concentrarse únicamente en la dinámica semántica y estructural de la escena en el espacio latente. Esta ineficiencia motivó la búsqueda de alternativas que eviten por completo esta fase de reconstrucción física.
+
+\subsection{El Paradigma Joint Embedding Architectures (JEA)}
+El paradigma de \textit{Joint Embedding Architectures} elude por completo la fase de reconstrucción. En su lugar, el sistema toma dos entradas correlacionadas $x, y \in \mathcal{X}$ (p.e. dos transformaciones de una misma imagen, o dos fotogramas consecutivos de un vídeo), las proyecta a través de dos encoders $f_{\theta}: \mathcal{X} \to \mathcal{Z}$ y $g_{\phi}: \mathcal{X} \to \mathcal{Z}$, y minimiza la distancia entre sus representaciones en $\mathcal{Z}$:
+\begin{equation}
+\mathcal{L}_{\text{JEA}}(x, y) = \left\| f_{\theta}(x) - g_{\phi}(y) \right\|_2^2
+\end{equation}
+donde $\theta, \phi \in \Theta$ son los parámetros de cada encoder, que pueden ser compartidos ($\theta = \phi$) o independientes según la arquitectura concreta.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.5cm, auto, >=Stealth]
+    \node (x) [draw, rectangle, minimum width=2.5cm, minimum height=1cm] {Entrada $x$};
+    \node (y) [draw, rectangle, minimum width=2.5cm, minimum height=1cm, below=of x] {Entrada $y$};
+    \node (fx) [draw, rectangle, minimum width=2cm, minimum height=1cm, right=of x, xshift=1cm] {Encoder $f_{\theta}$};
+    \node (gy) [draw, rectangle, minimum width=2cm, minimum height=1cm, right=of y, xshift=1cm] {Encoder $g_{\phi}$};
+    \node (zx) [circle, draw, right=of fx, xshift=1cm] {$z_x$};
+    \node (zy) [circle, draw, right=of gy, xshift=1cm] {$z_y$};
+    \node (loss) [draw, diamond, minimum width=1.5cm, minimum height=1.5cm, right=of zx, yshift=-1.1cm, xshift=1cm] {Loss}; 
+
+    \draw[->] (x) -- (fx);
+    \draw[->] (y) -- (gy);
+    \draw[->] (fx) -- (zx);
+    \draw[->] (gy) -- (zy);
+    \draw[->] (zx) -| (loss);
+    \draw[->] (zy) -| (loss);
+    \draw[dashed, <->] (fx) -- node[left] {Shared $\theta$ (opcional)} (gy);
+\end{tikzpicture}
+\caption{Diagrama conceptual de una Joint Embedding Architecture (JEA). Los encoders $f_\theta$ y $g_\phi$ proyectan las entradas correlacionadas al espacio latente $\mathcal{Z}$; la pérdida penaliza la distancia entre sus representaciones. El intercambio de parámetros (indicado con línea discontinua) es opcional y depende de la arquitectura concreta.}
+\label{fig:jea_diagram}
+\end{figure}
+
+En general, los encoders $f_{\theta}$ y $g_{\phi}$ pueden tener diferentes parámetros. Sin embargo, en la mayoría de implementaciones prácticas, ambos encoders comparten los mismos pesos ($\theta = \phi$). Esto garantiza que la función de proyección sea idéntica para ambas ramas, de modo que entradas iguales producen necesariamente el mismo embedding.
+
+Al no requerir un decoder que opere en $\mathbb{R}^D$, las JEA no invierten capacidad del modelo en detalles irrelevantes para la tarea, como los que hemos comentado anteriormente. Este encoder actúa a modo de filtro que retiene únicamente la información semánticamente relevante, estructurando el espacio $\mathcal{Z}$ de manera tal que la similaridad geométrica refleje similaridad semántica.
+
+Sin embargo, este paradigma plantea importantes interrogantes. En primer lugar, ¿Garantiza el proceso de optimización que la representación obtenida recupere fielmente los verdaderos grados de libertad del mundo físico (las variables latentes generadoras), o corre el riesgo de distorsionarlas de forma que pierdan su estructura? Este es el problema del \emph{colapso de las representaciones} \cite{jing2022understanding}. En segundo lugar; ¿es posible planificar y controlar un agente de forma óptima en este espacio sin degradar su rendimiento real? En el Capítulo~\ref{cap:modelos_mundo} se introduce la dimensión temporal incorporando una ventana de planificación dentro de estos espacios latentes y se analizan las soluciones de tipo JEPA desarrolladas para evitar el colapso. Por su parte, en el Capítulo~\ref{cap:leworldmodel} explora la solución de regularización isótropa (SIGReg) propuesta en 2025 \cite{balestriero2025lejepa} como evolución para superar los métodos matriciales de tipo VICReg marcando el camino hacia la planificación en el espacio $\mathcal{Z}$.
+
+En este trabajo abordamos la trayectoria histórica y conceptual que ha permitido consolidar el paradigma de las Joint Embedding Architectures. El hilo conductor es la resolución del problema más persistente de este paradigma: el \textbf{representation collapse}, donde la red minimiza la energía a cero mapeando todas las entradas a una constante trivial $f_{\theta}(x) = c$. La noción central es la de \emph{compatibilidad}: una medida no normalizada que cuantifica el grado de correspondencia semántica entre dos variables de entrada, y cuya formalización mediante funciones de energía se desarrolla en el capítulo siguiente donde se introduce formalmente los Modelos Basados en Energía (EBM) como marco unificador para el aprendizaje de compatibilidades, comparando los escenarios discretos y continuos, y sentando las bases físicas del Principio de Máxima Entropía de Jaynes.
