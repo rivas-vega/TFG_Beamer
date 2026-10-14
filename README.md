@@ -6,7 +6,7 @@
 [![Pages: 100+](https://img.shields.io/badge/Monograph-100%2B%20Pages-green.svg)]()
 
 > **Spanish Title:** *Fundamentos Matemáticos de los Energy-Based Models y las Joint Embedding Architectures: Del Representation Collapse a los World Models*  
-> **Author:** Pedro Rivas Vega (`rivas-vega`)  
+> **Author:** Pedro (`@rivas-vega`)  
 > **Supervisor:** Prof. Eduardo Sánchez Karhunen  
 > **Department:** Departamento de Matemática Aplicada II, Universidad de Sevilla  
 > **Grade / Distinction:** Highest Honors (Matrícula de Honor candidate)
@@ -133,7 +133,7 @@ If you consult or build upon the mathematical formulations in this work:
 
 ```bibtex
 @mastersthesis{rivasvega2024ebm_jepa,
-  author       = {Pedro Rivas Vega},
+  author       = {Rivas, P.},
   title        = {{Fundamentos Matemáticos de los Energy-Based Models y las Joint Embedding Architectures: Del Representation Collapse a los World Models}},
   school       = {Universidad de Sevilla, Departamento de Matemática Aplicada II},
   year         = {2024},
@@ -146,8 +146,6 @@ If you consult or build upon the mathematical formulations in this work:
 
 ## 👤 Author
 
-**Pedro Rivas Vega**  
+**Pedro** ([@rivas-vega](https://github.com/rivas-vega))  
 *M2 MVA, École Normale Supérieure Paris-Saclay*  
-*B.S. in Mathematics, Universidad de Sevilla*  
-- GitHub: [@rivas-vega](https://github.com/rivas-vega)
-- Email: [pedrorivasvega@gmail.com](mailto:pedrorivasvega@gmail.com)
+*B.S. in Mathematics, Universidad de Sevilla*
